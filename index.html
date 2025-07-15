@@ -1,0 +1,166 @@
+<!DOCTYPE html>
+<html lang="zh-Hans">
+
+<head>
+    <meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <meta name="referrer" content="always">
+    <meta name="applicable-device" content="pc,mobile">
+    <title>本地IP查询 | 网络测试</title>
+    <link rel="icon" href="./images/icon.png" type="image/x-icon">
+    <link rel="stylesheet" href="./assets/css/style.css">
+    <link rel="stylesheet" href="./assets/css/font.css">
+    <script src="./assets/js/chart.js"></script>
+
+        <script>
+        // 获取IP地址
+        async function fetchPublicIP() {
+            try {
+                const response = await fetch('/api/ip');
+                if (!response.ok) throw new Error('网络响应异常');
+
+                const data = await response.json();
+                document.getElementById('ipResult').innerText = `${data.ip}`;
+            } catch (error) {
+                document.getElementById('ipResult').innerText = `无法获取IP地址: ${error.message}`;
+            }
+        }
+        // 在页面加载完成后立即获取IP地址
+        window.onload = fetchPublicIP;
+    </script>
+
+</head>
+
+<body aria-hidden="false" style="padding: 50px 0px 130px;">
+    <header> </header>
+    <main class="b" style="height: auto !important;">
+        <div class="r" style="height: auto !important;">
+            <div class="s" style="height: auto !important;">
+                <div class="u" style="height: auto !important;">
+                    <div class="v">
+                        <div class="w mb-c">
+                            <h2>工具简介:</h2>
+                            <div class="m-txt">
+                                <p class="tool-description">
+                                    IP地址查询工具，支持一键获取<strong>本机上网IP</strong>、网络测试。无论是网络故障排查、还是网络安全分析，都能帮您轻松掌握IP信息，操作简单高效。
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="x">
+                        <div class="y">
+                            <div class="z">
+                                <div class="ba">
+                                    <h3>我的IP</h3> 
+                                    <div class="bn"> <span id="ipResult" class="bc">正在获取IP地址...</span>
+                                    <button id="copy-button" class="bk bo"> <span class="bp">📋</span> 复制 </button>
+                                    </div>
+                                </div>
+                                <div id="ipResultContainer" class="bl" style="display: flex;">
+                                    <div class="bm">
+                                        <div class="bn">
+                                            <h3>网络测试🚀</h3> 
+                                              <!-- 速度显示 -->
+                                            <p>网速：<span id="currentSpeed">--</span> Mbp/s</p>
+                                            <!-- 延迟测试结果 -->
+                                            <p>延迟：<span id="latency">--</span> ms</p>
+                                            <!-- 丢包率测试结果 -->
+                                            <p>丢包率：<span id="packetLoss">--</span></p>
+
+                                            <button onclick="startAllTests()" class="bk bo"> <span class="bp">📈</span> 开始测试</button>
+                                        </div>
+                                        <div class="bq" id="ipInfo">
+                                            <div class="br">
+                                                <div class="bs">
+                                                      <!-- 图表 -->
+                                                    <canvas id="speedChart"></canvas>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="cl" style="height: auto !important;">
+                        <div class="cn" style="height: auto !important;">
+                            <h3><span class="co">💻</span> 本机ip地址是什么？</h3>
+                            <p>本机IP地址是指分配给您当前使用设备的IP地址，它可能是公网IP或私有IP。在家庭或办公网络中，您的设备通常会获得一个由路由器分配的私有IP地址（如:192.168.*.*），而您的路由器则拥有一个由ISP分配的公网IP地址。通过本工具，您可以查询到的是您的内部IP地址，即您连接到内网时使用的实际IP地址。
+                            </p>
+                            <h3><span class="co">🔍</span> 本机ip地址如何查询？</h3>
+                            <p>通过IP地址查询工具，您可以轻松获取本机IP信息。 查询本机IP地址有多种方法，具体取决于您使用的操作系统和需要查询的IP类型（公网IP或本地IP）：</p>
+                            <div class="cv">
+                                <div class="cw">
+                                    <h4>本地IP查询（内网IP查询）</h4>
+                                    <div class="cx">
+                                        <div class="cy"> <span class="cz">🪟</span> <span class="da">Windows系统:
+                                                打开命令提示符，输入 ipconfig</span> </div>
+                                        <div class="cy"> <span class="cz">🍎</span> <span class="da">Mac/Linux系统:
+                                                打开终端，输入 ifconfig 或 ip addr</span> </div>
+                                    </div>
+                                </div>
+                                <div class="cw">
+                                    <h4>公网IP查询</h4>
+                                    <div class="cx">
+                                        <div class="cy"> <span class="cz">🌐</span> <span class="da">在线IP地址查询:
+                                                使用本工具直接查看您的IP地址</span> </div>
+                                        <div class="cy"> <span class="cz">🔍</span> <span
+                                                class="da">通过搜索引擎：在搜索引擎中搜索"我的IP"</span> </div>
+                                        <div class="cy"> <span class="cz">🌍</span> <span class="da">访问专业IP查询网站</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <p class="db">请注意，如果您使用了VPN或代理服务，查询到的IP将是VPN或代理服务器的IP地址，而非您真实的网络IP地址。有任何功能建议请留言：<a href="mailto:monstertsl@qq.com">monstertsl@qq.com</a></p>
+                            
+                                </ins></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <!-- 复制按钮 -->
+    <script>
+        function showToast(msg) {
+            var toast = document.getElementById('toast');
+            toast.innerText = msg;
+            toast.style.display = 'block';
+            clearTimeout(window.toastTimer);
+            window.toastTimer = setTimeout(function() {
+                toast.style.display = 'none';
+            }, 1500);
+        }
+
+        document.getElementById('copy-button').addEventListener('click', function() {
+            var text = document.getElementById("ipResult").innerText;
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(function() {
+                    showToast('复制成功');
+                }, function(err) {
+                    showToast('复制失败');
+                });
+            } else {
+                // 兼容 HTTP 或不支持 clipboard 的环境
+                var textarea = document.createElement('textarea');
+                textarea.value = text;
+                document.body.appendChild(textarea);
+                textarea.select();
+                try {
+                    document.execCommand('copy');
+                    showToast('复制成功');
+                } catch (err) {
+                    showToast('复制失败');
+                }
+                document.body.removeChild(textarea);
+            }
+        });
+    </script>
+    <script src="./assets/js/main.js"></script>
+    <div id="toast" style="display:none;position:fixed;bottom:40px;left:50%;transform:translateX(-50%);background:rgba(0,0,0,0.8);color:#fff;padding:10px 24px;border-radius:6px;font-size:16px;z-index:9999;"></div>
+</body>
+
+</html>
