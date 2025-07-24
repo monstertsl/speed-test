@@ -96,11 +96,13 @@ async function startSpeedTest() {
       finishTest();
     }, 10000);
 
-    async function readStream() {
+    while (true) {
       const { done, value } = await reader.read();
+
       if (done) {
+        clearTimeout(stopTimeout);
         finishTest();
-        return;
+        break;
       }
 
       // 累加字节数
@@ -113,8 +115,6 @@ async function startSpeedTest() {
       // 更新图表
       updateChart(speed);
 
-      // 继续读取
-      readStream();
     }
 
     function finishTest() {
@@ -122,7 +122,6 @@ async function startSpeedTest() {
       document.getElementById('currentSpeed').textContent = maxSpeed.toFixed(2);
     }
 
-    readStream();
   } catch (err) {
     console.error('错误:', err);
     document.getElementById('currentSpeed').textContent = '--';
@@ -175,7 +174,7 @@ function startLossTest() {
   lostPackets = 0;
   document.getElementById('packetLoss').textContent = '--';
 
-  // 设置定时器，每 500ms 发送一次请求
+  // 设置定时器，每 100ms 发送一次请求
   lossTestInterval = setInterval(() => {
     totalPackets++; // 总请求数加 1
 
@@ -198,7 +197,7 @@ function startLossTest() {
       const lossRate = (lostPackets / totalPackets * 100).toFixed(1);
       document.getElementById('packetLoss').textContent = lossRate + '%';
     }
-  }, 100); // 每 500ms 发送一次请求
+  }, 100); // 每 100ms 发送一次请求
 }
 
 // === 页面加载完成后初始化 ===
