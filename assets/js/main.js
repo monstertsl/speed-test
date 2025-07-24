@@ -1,7 +1,7 @@
 // === 全局变量定义 ===
 
 let speedChart;            // Chart.js 图表实例
-let maxSpeed = 0;          // 记录测试过程中的最大下载速度（MB/s）
+let maxSpeed = 0;          // 记录测试过程中的最大下载速度（Mbp/s）
 let lossTestInterval;      // 用于丢包率测试的定时器 ID
 let totalPackets = 0;      // 丢包测试中发送的总请求数
 let lostPackets = 0;       // 丢包测试中失败的请求数
@@ -27,7 +27,7 @@ function initChart() {
     data: {
       labels: [], // 后续通过 push 添加空标签（不显示）
       datasets: [{
-        label: '下载速度 (MB/s)',   // 图例名称
+        label: '下载速度 (Mbp/s)',   // 图例名称
         data: [],                   // 初始为空，后续动态添加数据
         borderColor: 'rgba(75, 192, 192, 1)', // 线条颜色
         fill: false,                // 不填充区域
@@ -75,11 +75,13 @@ function initChart() {
 }
 
 // === 下载速度测试主函数 ===
+// === 下载速度测试主函数（10秒自动停止） ===
 async function startSpeedTest() {
   // 初始化图表
   initChart();
   maxSpeed = 0; // 重置最大速度
   const startTime = performance.now(); // 记录开始时间
+  let totalBytes = 0; // 已下载字节数
 
   try {
     // 请求测试文件（确保该文件存在并被 Nginx 正确配置）
@@ -87,25 +89,43 @@ async function startSpeedTest() {
 
     // 获取流式响应体的 reader
     const reader = response.body.getReader();
-    let totalBytes = 0; // 已下载字节数
 
-    while (true) {
-      // 读取数据块
+    // 设置 10 秒后停止下载
+    const stopTimeout = setTimeout(() => {
+      reader.cancel(); // 主动取消流式读取
+      finishTest();
+    }, 10000);
+
+    async function readStream() {
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) {
+        finishTest();
+        return;
+      }
 
       // 累加字节数
       totalBytes += value.length;
 
-      // 计算已用时间（秒）和当前速度（MB/s）
+      // 计算已用时间（秒）和当前速度（Mbp/s）
       const elapsed = (performance.now() - startTime) / 1000;
       const speed = ((totalBytes * 8) / 1024 / 1024) / elapsed;
 
-      // 更新图表和最大速度
+      // 更新图表
       updateChart(speed);
+
+      // 继续读取
+      readStream();
     }
+
+    function finishTest() {
+      clearTimeout(stopTimeout); // 清除定时器
+      document.getElementById('currentSpeed').textContent = maxSpeed.toFixed(2);
+    }
+
+    readStream();
   } catch (err) {
-    console.error('下载失败:', err);
+    console.error('错误:', err);
+    document.getElementById('currentSpeed').textContent = '--';
   }
 }
 
