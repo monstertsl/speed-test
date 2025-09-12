@@ -1,3 +1,5 @@
+// --- 核心逻辑 ---
+
 // 常见 favicon 路径
 const DASHBOARD_COMMON_ICON_PATHS = [
     '/favicon.ico',
@@ -28,9 +30,55 @@ function createDashboardFallbackIcon(name) {
     return canvas.toDataURL('image/png');
 }
 
-// --- 修改后的 探测图标是否存在 函数 ---
-// 目标：更可靠地探测图标，并在失败时返回 fallback 图标
-// 策略：先尝试 CORS 请求，失败后再尝试 no-cors 探测
+/**
+ * 内部辅助函数：使用 <img> 标签检测图标 URL 是否有效
+ * 绕过 fetch 的 CORS 限制
+ * @param {string} iconUrl - 要检测的图标 URL
+ * @returns {Promise<boolean>} - Promise resolve 为 true(有效) 或 false(无效/404等)
+ */
+function isValidIconUrl(iconUrl) {
+    return new Promise((resolve) => {
+        const img = new Image();
+        // 设置一个合理的超时时间
+        const timeoutId = setTimeout(() => {
+            img.onload = null;
+            img.onerror = null;
+            // console.log(`[ImgCheck] Timeout for: ${iconUrl}`);
+            resolve(false); // 超时则认为无效
+        }, 500); // 0.5秒超时
+
+        // 图片加载成功回调
+        img.onload = () => {
+            clearTimeout(timeoutId);
+            // 简单检查尺寸，确保不是占位图或损坏的图
+            if (img.width > 0 && img.height > 0) {
+                // console.log(`[ImgCheck] Loaded successfully: ${iconUrl}`);
+                resolve(true);
+            } else {
+                // console.log(`[ImgCheck] Loaded but zero dimensions: ${iconUrl}`);
+                resolve(false);
+            }
+        };
+
+        // 图片加载失败回调 (包括 404, CORS blocked, 网络错误等)
+        img.onerror = () => {
+            clearTimeout(timeoutId);
+            // console.log(`[ImgCheck] Failed to load (onerror): ${iconUrl}`);
+            resolve(false);
+        };
+
+        // 开始加载
+        img.src = iconUrl;
+    });
+}
+
+
+/**
+ * 探测并加载网站图标 (使用 <img> 检测)
+ * @param {string} baseUrl - 网站的基础 URL
+ * @param {string} name - 网站名称，用于生成 fallback 图标
+ * @returns {Promise<string>} - Promise resolve 为图标 URL 或 fallback Data URL
+ */
 async function loadDashboardIcon(baseUrl, name) {
     // 确保 baseUrl 是一个有效的 URL 对象，用于解析相对路径
     let baseUrlObj;
@@ -41,91 +89,54 @@ async function loadDashboardIcon(baseUrl, name) {
         return createDashboardFallbackIcon(name);
     }
 
-    // 创建一个 AbortController 用于设置超时
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 500); // 0.5秒超时
+    // console.log(`[IconLoader] Starting icon search for: ${name} (${baseUrl})`);
 
-    for (const path of DASHBOARD_COMMON_ICON_PATHS) {
-        try {
-            // 使用 URL 构造函数确保路径正确拼接
-            const iconUrl = new URL(path, baseUrlObj).href;
-            // console.log(`[Debug] Trying to fetch icon (CORS): ${iconUrl}`);
+    // 为整个探测过程设置一个总体超时 (例如 8 秒)
+    const overallTimeoutPromise = new Promise(resolve => {
+        setTimeout(() => {
+            console.log(`[IconLoader] Overall timeout for ${name}`);
+            resolve(createDashboardFallbackIcon(name));
+        }, 5000); 
+    });
 
-            // --- 第一步：尝试标准 CORS 请求 ---
-            let response;
+    // 创建一个 Promise 来执行实际的探测逻辑
+    const probePromise = (async () => {
+         for (const path of DASHBOARD_COMMON_ICON_PATHS) {
             try {
-                response = await fetch(iconUrl, {
-                    method: 'GET',
-                    mode: 'cors', // 明确指定 CORS 模式
-                    signal: controller.signal
-                });
-                 // console.log(`[Debug] CORS request completed for: ${iconUrl}`);
-            } catch (corsError) {
-                // console.log(`[Debug] CORS request failed for: ${iconUrl}`, corsError.message);
-                // 如果 CORS 失败，进入第二步
-                // 重置超时控制器（因为上一次 fetch 可能已经 abort 了）
-                clearTimeout(timeoutId);
-                const controller2 = new AbortController();
-                const timeoutId2 = setTimeout(() => controller2.abort(), 500);
+                const iconUrl = new URL(path, baseUrlObj).href;
+                // console.log(`[IconLoader] Trying (via <img>): ${iconUrl}`);
 
-                try {
-                    // --- 第二步：尝试 no-cors 模式探测 ---
-                    // console.log(`[Debug] Trying no-cors fetch for: ${iconUrl}`);
-                    const noCorsResponse = await fetch(iconUrl, {
-                        method: 'HEAD', // HEAD 请求更轻量
-                        mode: 'no-cors',
-                        signal: controller2.signal
-                    });
-                    clearTimeout(timeoutId2); // 清除本次 no-cors 尝试的超时
+                // 使用 <img> 标签方式检测
+                const isValid = await isValidIconUrl(iconUrl);
 
-                     // console.log(`[Debug] no-cors response type for ${iconUrl}:`, noCorsResponse.type);
-                    // 在 no-cors 模式下，如果请求发出（即使被阻止读取内容），type 通常是 'opaque'
-                    // 我们假设 'opaque' 意味着图标存在
-                    if (noCorsResponse.type === 'opaque') {
-                        // console.log(`[Debug] Assuming icon exists (no-cors opaque) for: ${iconUrl}`);
-                        return iconUrl; // 返回 URL，让浏览器尝试加载
-                    } else {
-                        // console.log(`[Debug] no-cors request for ${iconUrl} did not return opaque.`);
-                        // 可能是网络错误等，继续下一个路径
-                        continue;
-                    }
-                } catch (noCorsError) {
-                    clearTimeout(timeoutId2);
-                    // console.log(`[Debug] no-cors fetch also failed for: ${iconUrl}`, noCorsError.message);
-                    // 两种方式都失败，继续下一个路径
+                if (isValid) {
+                    // console.log(`[IconLoader] Valid icon found using <img>: ${iconUrl}`);
+                    // 如果有效，直接返回该 URL
+                    return iconUrl;
+                } else {
+                    // console.log(`[IconLoader] Icon not valid or not found using <img>: ${iconUrl}`);
+                    // 无效则继续尝试下一个路径
                     continue;
                 }
+
+            } catch (error) {
+                console.warn(`[IconLoader] Unexpected error checking ${path} for ${name}:`, error);
+                continue; // 捕获意外错误，继续循环
             }
-
-            // 如果执行到这里，说明 CORS 请求成功完成
-            clearTimeout(timeoutId); // 清除主超时
-
-            // 检查 CORS 响应状态码
-            if (response.ok) {
-                // console.log(`[Debug] Icon found via CORS: ${iconUrl}`);
-                return iconUrl;
-            } else {
-                // console.log(`[Debug] Icon not found via CORS (Status ${response.status}): ${iconUrl}`);
-                // 状态码不是 2xx，继续尝试下一个路径
-                continue;
-            }
-
-        } catch (generalError) {
-            clearTimeout(timeoutId);
-            // console.log(`[Debug] General error for path ${path}:`, generalError.message);
-            // 其他未预期的错误，继续下一个路径
-            continue;
         }
-    }
 
-    // 如果所有预定义路径都尝试失败，则使用 fallback 图标
-    // console.log(`[Debug] All icon paths failed for ${name}, using fallback.`);
-    return createDashboardFallbackIcon(name);
+        // 所有路径都尝试完毕且未找到有效图标
+        // console.log(`[IconLoader] All paths exhausted for ${name}, using fallback.`);
+        return createDashboardFallbackIcon(name);
+    })();
+
+    // 使用 Promise.race 确保不会超过总体超时
+    return Promise.race([probePromise, overallTimeoutPromise]);
 }
-// --- 修改结束 ---
 
+// --- 加载 links.txt 并渲染链接 (保持不变)---
 
-// 加载 links.txt 并渲染链接 (保持不变)
+// 加载 links.txt 并渲染链接
 async function loadDashboardLinks() {
     const container = document.getElementById('dashboard-links-container');
     container.innerHTML = '<p>正在加载常用网站目录...</p>'; // 显示加载状态
@@ -157,8 +168,19 @@ async function loadDashboardLinks() {
             const img = document.createElement('img');
             img.className = 'dashboard-link-icon';
             img.alt = `${name} icon`;
+            img.loading = 'lazy'; // 启用懒加载
             // 异步加载图标
-            img.src = await loadDashboardIcon(url, name);
+            try {
+                 // 使用新的、使用 <img> 检测的函数
+                const iconSrc = await loadDashboardIcon(url, name);
+                img.src = iconSrc;
+                // console.log(`[Renderer] Icon set for ${name}:`, iconSrc);
+            } catch (iconError) {
+                console.error(`[Renderer] Error setting icon for ${name} (${url}):`, iconError);
+                // 即使异步加载出错，也使用 fallback
+                img.src = createDashboardFallbackIcon(name);
+            }
+
 
             const span = document.createElement('span');
             span.textContent = name;
@@ -178,12 +200,9 @@ async function loadDashboardLinks() {
     }
 }
 
-// 页面加载完成后执行导航链接加载 (保持不变)
+// 页面加载完成后执行导航链接加载
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', loadDashboardLinks);
 } else {
     loadDashboardLinks();
 }
-
-
-
