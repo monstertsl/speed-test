@@ -1,0 +1,5 @@
+# 服务名    URL (服务名和URL之间用空格或制表符分隔)
+百度 https://www.baidu.com
+有道翻译 https://fanyi.youdao.com/
+网络测试 http://10.10.168.197/
+networktest http://10.10.168.197/
