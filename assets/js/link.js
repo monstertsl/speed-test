@@ -43,7 +43,7 @@ async function loadDashboardIcon(baseUrl, name) {
 
     // 创建一个 AbortController 用于设置超时
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5秒超时
+    const timeoutId = setTimeout(() => controller.abort(), 500); // 0.5秒超时
 
     for (const path of DASHBOARD_COMMON_ICON_PATHS) {
         try {
@@ -66,7 +66,7 @@ async function loadDashboardIcon(baseUrl, name) {
                 // 重置超时控制器（因为上一次 fetch 可能已经 abort 了）
                 clearTimeout(timeoutId);
                 const controller2 = new AbortController();
-                const timeoutId2 = setTimeout(() => controller2.abort(), 5000);
+                const timeoutId2 = setTimeout(() => controller2.abort(), 500);
 
                 try {
                     // --- 第二步：尝试 no-cors 模式探测 ---
